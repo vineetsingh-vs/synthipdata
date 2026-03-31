@@ -1,0 +1,118 @@
+# SynthIPData — Synthetic Data Generation Configuration
+
+generation:
+  model: "mistralai/Mistral-7B-v0.1"  # Base model (QLoRA adapter loaded separately)
+  adapter_path: "checkpoints/best/"     # Path to trained QLoRA adapter
+  max_new_tokens: 1024
+  temperature: 0.8                      # Higher = more creative/diverse
+  top_p: 0.9
+  top_k: 50
+  repetition_penalty: 1.1
+  do_sample: true
+  seed: 42
+
+# Prompt templates for each rare category
+# {tech_domain} and {specific_topic} are filled dynamically
+prompts:
+  101_rejection:
+    system: >
+      You are a USPTO patent examiner writing an office action. Generate a
+      Section 101 subject matter eligibility rejection for a patent application
+      in the field of {tech_domain}. The rejection should follow the Alice/Mayo
+      framework: (1) identify the abstract idea or natural phenomenon,
+      (2) analyze whether the claims add significantly more.
+    variations:
+      - "The invention relates to {specific_topic}. Write the examiner's 101 rejection."
+      - "Draft a 101 rejection where the claims are directed to {specific_topic}. Include the examiner's analysis under Step 2A and Step 2B of the Alice framework."
+      - "Generate an office action rejecting claims 1-15 under 35 USC 101. The application covers {specific_topic}. The examiner finds the claims directed to an abstract idea."
+
+  double_patenting:
+    system: >
+      You are a USPTO patent examiner writing a double patenting rejection.
+      The current application overlaps with a previously filed application
+      by the same assignee in {tech_domain}. Generate the rejection analysis
+      comparing the claims.
+    variations:
+      - "Write a non-statutory double patenting rejection for an application covering {specific_topic}. The conflicting application covers a closely related method."
+      - "Draft an obviousness-type double patenting rejection. Both applications relate to {specific_topic} but with different claim scope."
+
+  112f_rejection:
+    system: >
+      You are a USPTO patent examiner issuing a 112(f) means-plus-function
+      interpretation and related rejection for a {tech_domain} application.
+      Identify the means-plus-function limitations and explain the
+      corresponding structure in the specification.
+    variations:
+      - "Write a 112(f) rejection for claims using functional language to describe {specific_topic}."
+      - "Draft an office action where claims 1-10 invoke 112(f) interpretation for {specific_topic}. The examiner finds insufficient corresponding structure."
+
+  restriction_requirement:
+    system: >
+      You are a USPTO patent examiner issuing a restriction requirement
+      for a {tech_domain} application that spans multiple inventive groups.
+      Identify the distinct inventions and explain why they require separate examination.
+    variations:
+      - "Issue a restriction requirement for an application covering {specific_topic}. Identify at least 2 distinct inventive groups."
+      - "Draft a restriction requirement where the method claims and apparatus claims for {specific_topic} are found to be independent and distinct."
+
+  112a_rejection:
+    system: >
+      You are a USPTO patent examiner writing a 112(a) written description
+      rejection for a {tech_domain} application. The specification does not
+      adequately describe the claimed invention.
+    variations:
+      - "Write a 112(a) rejection for claims directed to {specific_topic}. The specification lacks sufficient detail to demonstrate possession of the invention."
+      - "Draft an office action rejecting claims under 112(a) for {specific_topic}. The examiner finds the claims broader than what the specification supports."
+
+# Topic variations per tech area (used to fill {specific_topic})
+topic_variations:
+  biotech:
+    - "CRISPR-based gene editing for treating sickle cell disease"
+    - "mRNA vaccine platform targeting multiple viral antigens"
+    - "protein folding prediction using computational methods"
+    - "synthetic biology circuit for detecting cancer biomarkers"
+    - "microbiome-based therapeutic for inflammatory bowel disease"
+    - "aptamer-based diagnostic for early-stage Alzheimer's detection"
+    - "engineered T-cell therapy with improved tumor specificity"
+    - "biosensor for real-time glucose monitoring using nanomaterials"
+
+  ai_ml:
+    - "transformer-based architecture for patent claim generation"
+    - "reinforcement learning system for autonomous vehicle navigation"
+    - "federated learning framework for privacy-preserving medical imaging"
+    - "graph neural network for drug-target interaction prediction"
+    - "natural language processing pipeline for legal document analysis"
+    - "generative adversarial network for synthetic medical image creation"
+    - "attention mechanism for multi-modal sensor fusion"
+    - "neural architecture search for edge computing optimization"
+
+  nanotech:
+    - "carbon nanotube composite with enhanced thermal conductivity"
+    - "quantum dot array for next-generation solar cell efficiency"
+    - "nanoparticle drug delivery system with targeted release mechanism"
+    - "graphene-based membrane for water desalination"
+    - "nanoscale magnetic material for high-density data storage"
+
+  semiconductors:
+    - "FinFET transistor design with reduced leakage current"
+    - "3D NAND flash memory architecture with improved endurance"
+    - "GaN-on-silicon power amplifier for 5G base stations"
+    - "chiplet-based SoC design with heterogeneous integration"
+    - "EUV lithography process for sub-3nm node fabrication"
+    - "in-memory computing architecture for AI inference acceleration"
+
+# Generation targets per category
+targets:
+  101_biotech: 1500
+  101_ai_ml: 2000
+  dp_ai_ml: 1000
+  112f_biotech: 800
+  restriction_ai_ml: 1000
+  112a_ai_ml: 1500
+  101_nanotech: 600
+  dp_semiconductors: 1500
+
+output:
+  format: "jsonl"
+  s3_bucket: "synthipdata"
+  s3_prefix: "generated/"

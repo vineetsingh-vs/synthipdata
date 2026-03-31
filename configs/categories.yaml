@@ -1,0 +1,118 @@
+# SynthIPData — Rare-Case Category Definitions
+# These categories were identified through frequency analysis of
+# USPTO examination data (2015-2024)
+
+year_range:
+  start: 2015
+  end: 2024
+  rationale: "Post-Alice (2014) framework ensures consistent legal standards"
+
+categories:
+  - id: "101_biotech"
+    name: "101 Rejections in Biotech"
+    rejection_type: "101"
+    tech_area: "Biotech/Pharma"
+    cpc_codes: ["A61", "C07", "C12"]
+    description: >
+      Section 101 rejections are predominantly a software/business method issue.
+      In biotech, they are rare and involve unique eligibility questions around
+      natural phenomena and laws of nature.
+    min_seeds_target: 150
+    synthetic_target: 1500
+    difficulty: "medium"
+
+  - id: "101_ai_ml"
+    name: "101 Rejections in AI/ML"
+    rejection_type: "101"
+    tech_area: "AI/Machine Learning"
+    cpc_codes: ["G06N"]
+    description: >
+      AI patent eligibility is a rapidly evolving area with inconsistent
+      examiner treatment. The Alice framework's application to ML inventions
+      remains unsettled.
+    min_seeds_target: 200
+    synthetic_target: 2000
+    difficulty: "easy"
+
+  - id: "dp_ai_ml"
+    name: "Double Patenting in AI/ML"
+    rejection_type: "double_patenting"
+    tech_area: "AI/Machine Learning"
+    cpc_codes: ["G06N"]
+    description: >
+      AI companies file many related applications covering similar architectures
+      with incremental differences. Double patenting rejections in this space
+      are rare but increasing.
+    min_seeds_target: 100
+    synthetic_target: 1000
+    difficulty: "medium"
+
+  - id: "112f_biotech"
+    name: "112(f) Means-Plus-Function in Biotech"
+    rejection_type: "112f"
+    tech_area: "Biotech/Pharma"
+    cpc_codes: ["A61", "C07", "C12"]
+    description: >
+      Means-plus-function claiming in biotech is extremely rare and creates
+      unique legal issues around functional claim language in biological systems.
+    min_seeds_target: 80
+    synthetic_target: 800
+    difficulty: "hard"
+
+  - id: "restriction_ai_ml"
+    name: "Restriction Requirements in AI/ML"
+    rejection_type: "restriction"
+    tech_area: "AI/Machine Learning"
+    cpc_codes: ["G06N"]
+    description: >
+      AI inventions often span multiple classifications (e.g., ML method +
+      application domain). Restriction requirements forcing applicants to
+      split claims are unusual but growing.
+    min_seeds_target: 100
+    synthetic_target: 1000
+    difficulty: "medium"
+
+  - id: "112a_ai_ml"
+    name: "112(a) Written Description in AI/ML"
+    rejection_type: "112a"
+    tech_area: "AI/Machine Learning"
+    cpc_codes: ["G06N"]
+    description: >
+      Adequately describing AI/ML inventions in patent specifications is
+      notoriously difficult. These rejections question whether the spec
+      actually supports the claimed invention.
+    min_seeds_target: 150
+    synthetic_target: 1500
+    difficulty: "easy"
+
+  - id: "101_nanotech"
+    name: "101 Rejections in Materials/Nanotech"
+    rejection_type: "101"
+    tech_area: "Materials/Nanotech"
+    cpc_codes: ["B82", "C01B"]
+    description: >
+      The rarest combination in our analysis. Subject matter eligibility
+      challenges in nanotech involve questions about natural phenomena
+      at the nanoscale.
+    min_seeds_target: 60
+    synthetic_target: 600
+    difficulty: "hard"
+
+  - id: "dp_semiconductors"
+    name: "Double Patenting in Semiconductors"
+    rejection_type: "double_patenting"
+    tech_area: "Semiconductors"
+    cpc_codes: ["H01L"]
+    description: >
+      Semiconductor companies file extensive patent portfolios with
+      overlapping claims. Double patenting analysis requires deep
+      technical comparison of circuit designs and fabrication methods.
+    min_seeds_target: 150
+    synthetic_target: 1500
+    difficulty: "easy"
+
+# Evaluation settings
+evaluation:
+  memorization_threshold: 0.95   # Cosine similarity above this = memorized
+  garbage_threshold: 0.30        # Cosine similarity below this = nonsense
+  min_validity_score: 0.70       # Minimum linguistic quality score

@@ -1,0 +1,35 @@
+# SynthIPData — QLoRA Fine-Tuning Configuration
+# For fine-tuning Mistral-7B on rare patent examination documents
+
+model:
+  name: "mistralai/Mistral-7B-v0.1"
+  quantization: "4bit"           # QLoRA uses 4-bit quantization
+  dtype: "float16"
+
+lora:
+  r: 16                          # LoRA rank
+  lora_alpha: 32                 # LoRA alpha (scaling factor)
+  lora_dropout: 0.05
+  target_modules:                # Which layers to apply LoRA to
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  num_epochs: 3
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 4  # Effective batch size = 16
+  learning_rate: 2.0e-4
+  warmup_steps: 100
+  max_seq_length: 2048
+  logging_steps: 10
+  save_steps: 100
+  seed: 42                        # For reproducibility
+
+output:
+  checkpoint_dir: "checkpoints/"
+  s3_bucket: "synthipdata"
+  s3_prefix: "models/"

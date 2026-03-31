@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data files (too large for git)
+data/raw/
+data/processed/
+data/seeds/
+*.csv
+*.tsv
+*.parquet
+*.jsonl
+*.json
+!configs/*.yaml
+!configs/*.json
+
+# Model checkpoints
+*.pt
+*.bin
+*.safetensors
+checkpoints/
+
+# AWS
+.aws/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Results (keep figures, gitignore large metric files)
+results/metrics/*.csv
+results/metrics/*.json
+!results/metrics/.gitkeep
+
+# Logs
+*.log
+wandb/

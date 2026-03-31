@@ -1,0 +1,81 @@
+# SynthIPData — Evaluation Configuration
+# 8 metrics across 4 buckets
+
+evaluation:
+  seed: 42
+  test_split_ratio: 0.2   # 20% of real data held out for testing
+
+buckets:
+  utility:
+    description: "Does the synthetic data improve downstream task performance?"
+    metrics:
+      - name: "downstream_accuracy"
+        description: "PatentBERT classification accuracy on rare cases"
+        model: "anferico/bert-for-patents"
+        task: "rejection_type_classification"
+        measure: "accuracy, precision, recall, F1"
+        comparison: "with vs without synthetic augmentation"
+
+      - name: "few_shot_improvement"
+        description: "Performance gain when real data is extremely scarce"
+        setup: "Train with only 10, 25, 50 real examples + synthetic"
+        measure: "accuracy improvement curve"
+
+  coverage:
+    description: "Does the synthetic data fill gaps across all rare categories?"
+    metrics:
+      - name: "distribution_coverage"
+        description: "Vector space coverage analysis"
+        method: "Compare embedding density of synthetic vs seed in Qdrant"
+        measure: "KL divergence, coverage percentage per category"
+
+      - name: "category_balance"
+        description: "Uniformity across all 8 categories"
+        method: "Chi-square test of synthetic count distribution"
+        measure: "chi-square statistic, p-value"
+
+  validity:
+    description: "Does the synthetic data look like real patent documents?"
+    metrics:
+      - name: "linguistic_quality"
+        description: "Language fluency and naturalness"
+        method: "Perplexity score using a held-out language model"
+        measure: "mean perplexity, std deviation"
+
+      - name: "structural_correctness"
+        description: "Patent document format adherence"
+        method: "Rule-based checks for section headers, claim format, legal citations"
+        measure: "format compliance rate (0-1)"
+
+  risk:
+    description: "Is the synthetic data safe from memorization and duplication?"
+    metrics:
+      - name: "memorization_rate"
+        description: "How many synthetic docs are too similar to real ones"
+        method: "Cosine similarity between synthetic and seed embeddings in Qdrant"
+        threshold: 0.95
+        measure: "percentage of synthetic docs above threshold"
+
+      - name: "deduplication"
+        description: "Near-duplicate detection within synthetic dataset"
+        method: "Pairwise cosine similarity within synthetic embeddings"
+        threshold: 0.98
+        measure: "percentage of near-duplicate pairs"
+
+# Baseline comparison methods
+baselines:
+  - name: "no_augmentation"
+    description: "Train on real data only"
+
+  - name: "simple_paraphrasing"
+    description: "Use base LLM to paraphrase real documents (no fine-tuning)"
+    model: "mistralai/Mistral-7B-v0.1"
+    prompt: "Paraphrase the following patent office action while preserving its legal meaning:"
+
+  - name: "generic_llm"
+    description: "Use base Mistral with prompting only (no QLoRA)"
+    model: "mistralai/Mistral-7B-v0.1"
+    prompt: "Generate a patent office action rejection for {category}"
+
+  - name: "synthipdata"
+    description: "Our method: QLoRA fine-tuned Mistral-7B"
