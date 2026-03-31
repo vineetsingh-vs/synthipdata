@@ -23,12 +23,12 @@ def upload_directory(s3_client, local_dir, bucket, s3_prefix):
             s3_key = os.path.join(s3_prefix, relative_path)
             files.append((local_path, s3_key))
     
-    print(f"📤 Uploading {len(files)} files to s3://{bucket}/{s3_prefix}")
+    print(f"Uploading {len(files)} files to s3://{bucket}/{s3_prefix}")
     
     for local_path, s3_key in tqdm(files, desc="Uploading"):
         s3_client.upload_file(local_path, bucket, s3_key)
     
-    print(f"✅ Upload complete!")
+    print(f"Upload complete!")
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
     secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
     
     if not access_key or not secret_key:
-        print("⚠️  AWS credentials not found in environment variables.")
+        print("AWS credentials not found in environment variables.")
         print("   Set them with:")
         print('   export AWS_ACCESS_KEY_ID="your_key"')
         print('   export AWS_SECRET_ACCESS_KEY="your_secret"')

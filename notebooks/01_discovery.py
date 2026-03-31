@@ -27,7 +27,7 @@ from tqdm import tqdm
 import requests
 import os
 
-print("✅ Libraries installed and imported!")
+print("Libraries installed and imported!")
 
 
 # =========================================
@@ -45,27 +45,27 @@ import urllib.request
 # NOTE: Update this URL if it changes. Check the USPTO research datasets page.
 OA_URL = "https://bulkdata.uspto.gov/data/patent/office/actions/bigdata/2024/office_action_research_dataset.csv.zip"
 
-print("⬇️  Downloading USPTO Office Action Dataset...")
+print("Downloading USPTO Office Action Dataset...")
 print("   (This may take 5-10 minutes depending on your connection)")
 print("   If the download fails, the URL may have changed.")
 print("   Check: https://www.uspto.gov/ip-policy/economic-research/research-datasets")
 
 try:
     urllib.request.urlretrieve(OA_URL, "oa_dataset.zip")
-    print("✅ Downloaded!")
+    print("Downloaded!")
     
     # Unzip
     import zipfile
     with zipfile.ZipFile("oa_dataset.zip", "r") as z:
         z.extractall("oa_data/")
-    print("✅ Unzipped!")
+    print("Unzipped!")
     
     # Find the CSV file
     csv_files = [f for f in os.listdir("oa_data/") if f.endswith(".csv")]
-    print(f"📁 Found files: {csv_files}")
+    print(f"Found files: {csv_files}")
     
 except Exception as e:
-    print(f"⚠️  Download failed: {e}")
+    print(f"Download failed: {e}")
     print("")
     print("Don't worry! Here's what to do:")
     print("1. Go to: https://www.uspto.gov/ip-policy/economic-research/research-datasets")
@@ -86,21 +86,21 @@ import glob
 csv_files = glob.glob("oa_data/*.csv") + glob.glob("*.csv")
 if csv_files:
     csv_path = csv_files[0]
-    print(f"📄 Loading: {csv_path}")
+    print(f"Loading: {csv_path}")
 else:
     # If download failed, user needs to upload manually
     csv_path = input("Enter the path to your CSV file: ")
 
 # Load the data
-print("⏳ Loading data (this may take a minute for large files)...")
+print("Loading data (this may take a minute for large files)...")
 df = pd.read_csv(csv_path, low_memory=False)
 
-print(f"\n✅ Loaded {len(df):,} records")
-print(f"\n📋 Columns in the dataset:")
+print(f"\nLoaded {len(df):,} records")
+print(f"\nColumns in the dataset:")
 for col in df.columns:
     print(f"   - {col}")
 
-print(f"\n📊 First 5 rows:")
+print(f"\nFirst 5 rows:")
 df.head()
 
 
@@ -117,7 +117,7 @@ print(f"\nTotal records: {len(df):,}")
 print(f"Date range: {df['filing_date'].min() if 'filing_date' in df.columns else 'N/A'} to {df['filing_date'].max() if 'filing_date' in df.columns else 'N/A'}")
 
 # Show all column names and their types
-print(f"\n📋 Column details:")
+print(f"\nColumn details:")
 for col in df.columns:
     non_null = df[col].count()
     dtype = df[col].dtype
@@ -129,19 +129,19 @@ for col in df.columns:
 # - Technology area (might be called: uspc_class, cpc_code, technology_center, etc.)
 # - Date (might be called: filing_date, mail_date, etc.)
 
-print("\n🔍 Looking for rejection-related columns:")
+print("\nLooking for rejection-related columns:")
 rej_cols = [c for c in df.columns if any(term in c.lower() for term in ['reject', '101', '102', '103', '112'])]
 print(f"   Found: {rej_cols}")
 
-print("\n🔍 Looking for technology/classification columns:")
+print("\nLooking for technology/classification columns:")
 tech_cols = [c for c in df.columns if any(term in c.lower() for term in ['cpc', 'uspc', 'class', 'tech', 'art_unit'])]
 print(f"   Found: {tech_cols}")
 
-print("\n🔍 Looking for date columns:")
+print("\nLooking for date columns:")
 date_cols = [c for c in df.columns if any(term in c.lower() for term in ['date', 'year'])]
 print(f"   Found: {date_cols}")
 
-print("\n⚡ IMPORTANT: Copy the column names above and share them with Claude.")
+print("\nIMPORTANT: Copy the column names above and share them with Claude.")
 print("   Claude will help you write the exact filtering code for YOUR dataset.")
 
 
@@ -150,7 +150,7 @@ print("   Claude will help you write the exact filtering code for YOUR dataset."
 # ==========================================
 # We only want post-Alice (2014) data
 # 
-# ⚠️ You may need to adjust the column name below
+# You may need to adjust the column name below
 # based on what you saw in Cell 4
 
 # Try common date column names
@@ -168,14 +168,14 @@ if date_col:
     # Filter to 2015-2024
     df_filtered = df[df['year'].between(2015, 2024)].copy()
     
-    print(f"📅 Date column used: {date_col}")
-    print(f"📊 Before filter: {len(df):,} records")
-    print(f"📊 After filter (2015-2024): {len(df_filtered):,} records")
+    print(f"Date column used: {date_col}")
+    print(f"Before filter: {len(df):,} records")
+    print(f"After filter (2015-2024): {len(df_filtered):,} records")
     
-    print(f"\n📊 Records per year:")
+    print(f"\nRecords per year:")
     print(df_filtered['year'].value_counts().sort_index())
 else:
-    print("⚠️  Could not find a date column automatically.")
+    print("Could not find a date column automatically.")
     print("   Check the column names from Cell 4 and set date_col manually:")
     print("   date_col = 'your_column_name_here'")
     df_filtered = df.copy()  # Use all data for now
@@ -187,7 +187,7 @@ else:
 # This is the KEY discovery step
 # We count how often each rejection type appears
 #
-# ⚠️ The column names below may need adjustment
+# The column names below may need adjustment
 # based on your actual data from Cell 4
 
 # Common patterns in USPTO Office Action datasets:
@@ -202,7 +202,7 @@ for candidate in ['rejection_type', 'rejection_ground', 'ifw_number']:
         break
 
 if rej_type_col:
-    print(f"📊 Using rejection column: {rej_type_col}")
+    print(f"Using rejection column: {rej_type_col}")
     print(f"\nRejection Type Counts:")
     print("=" * 50)
     counts = df_filtered[rej_type_col].value_counts()
@@ -212,7 +212,7 @@ if rej_type_col:
         print(f"  {str(rej_type):25s} → {count:>10,} ({pct:5.1f}%) {bar}")
 else:
     # Try Option B: boolean columns
-    print("📊 Looking for individual rejection columns...")
+    print("Looking for individual rejection columns...")
     rej_bool_cols = [c for c in df_filtered.columns if any(
         term in c.lower() for term in ['101', '102', '103', '112', 'double_pat', 'restrict']
     )]
@@ -227,7 +227,7 @@ else:
             bar = "█" * int(pct)
             print(f"  {col:25s} → {count:>10,} ({pct:5.1f}%) {bar}")
     else:
-        print("⚠️  Could not find rejection type columns automatically.")
+        print("Could not find rejection type columns automatically.")
         print("   Share the column names from Cell 4 with Claude for help.")
 
 
@@ -245,7 +245,7 @@ for candidate in ['uspc_class', 'cpc_group', 'cpc_code', 'technology_center', 'a
         break
 
 if tech_col and rej_type_col:
-    print(f"📊 Cross-referencing: {rej_type_col} × {tech_col}")
+    print(f"Cross-referencing: {rej_type_col} × {tech_col}")
     print("=" * 60)
     
     # Count combinations
@@ -260,24 +260,24 @@ if tech_col and rej_type_col:
     print(f"Rarity threshold (bottom 10%): {threshold:.0f} or fewer cases")
     print(f"Rare combinations found: {len(rare):,}")
     
-    print(f"\n🔴 TOP 30 RAREST COMBINATIONS:")
+    print(f"\nTOP 30 RAREST COMBINATIONS:")
     print("-" * 60)
     for _, row in rare.head(30).iterrows():
         print(f"  {str(row[rej_type_col]):20s} + {str(row[tech_col]):20s} → {row['count']:>6,} cases")
     
-    print(f"\n🟢 TOP 10 MOST COMMON COMBINATIONS:")
+    print(f"\nTOP 10 MOST COMMON COMBINATIONS:")
     print("-" * 60)
     for _, row in combos.tail(10).iterrows():
         print(f"  {str(row[rej_type_col]):20s} + {str(row[tech_col]):20s} → {row['count']:>6,} cases")
 
 elif tech_col:
     # Just show technology area distribution
-    print(f"📊 Technology area distribution ({tech_col}):")
+    print(f"Technology area distribution ({tech_col}):")
     print(df_filtered[tech_col].value_counts().head(20))
-    print("\n⚠️  Need rejection type column to find rare combinations.")
+    print("\nNeed rejection type column to find rare combinations.")
     print("   Share column names with Claude for help.")
 else:
-    print("⚠️  Could not find technology area column automatically.")
+    print("Could not find technology area column automatically.")
     print("   Share the column names from Cell 4 with Claude for help.")
 
 
@@ -314,7 +314,7 @@ print("=" * 70)
 print("SEED AVAILABILITY CHECK — Our 8 Target Categories")
 print("=" * 70)
 print()
-print(f"⚠️  NOTE: This cell requires the correct column names from YOUR dataset.")
+print(f"NOTE: This cell requires the correct column names from YOUR dataset.")
 print(f"   If the counts below show 0 for everything, the column names need fixing.")
 print(f"   Share the Cell 4 output with Claude and he'll fix it for you.")
 print()
@@ -331,16 +331,16 @@ if rej_type_col and tech_col:
             mask_tech = mask_tech | df_filtered[tech_col].astype(str).str.startswith(prefix)
         
         count = len(df_filtered[mask_rej & mask_tech])
-        status = "✅" if count >= 50 else "⚠️" if count >= 20 else "❌"
+        status = "" if count >= 50 else "" if count >= 20 else ""
         
         print(f"  {status} {cat['name']:35s} → {count:>6,} real cases found")
         
     print()
-    print("✅ = Enough seeds (50+)")
-    print("⚠️  = Low but usable (20-49)")
-    print("❌ = Very few, may need to broaden search (<20)")
+    print("= Enough seeds (50+)")
+    print("= Low but usable (20-49)")
+    print("= Very few, may need to broaden search (<20)")
 else:
-    print("⚠️  Cannot count yet — need correct column names.")
+    print("Cannot count yet — need correct column names.")
     print("   Share Cell 4 output with Claude to proceed.")
 
 
@@ -380,10 +380,10 @@ if rej_type_col and tech_col:
         with open("application_numbers_by_category.json", "w") as f:
             json.dump(all_app_numbers, f, indent=2, default=str)
         
-        print(f"\n💾 Saved to: application_numbers_by_category.json")
+        print(f"\nSaved to: application_numbers_by_category.json")
         print(f"   Total unique applications: {sum(len(v) for v in all_app_numbers.values()):,}")
     else:
-        print("⚠️  Could not find application number column.")
+        print("Could not find application number column.")
         print("   Check Cell 4 output for the correct column name.")
 
 
@@ -422,7 +422,7 @@ plt.tight_layout()
 plt.savefig("discovery_results.png", dpi=150, bbox_inches="tight")
 plt.show()
 
-print("📊 Saved: discovery_results.png")
+print("Saved: discovery_results.png")
 
 
 # ==========================================
@@ -430,7 +430,7 @@ print("📊 Saved: discovery_results.png")
 # ==========================================
 
 print("=" * 60)
-print("📋 DAY 1 — DISCOVERY COMPLETE")
+print("DAY 1 — DISCOVERY COMPLETE")
 print("=" * 60)
 print()
 print("What you now have:")
@@ -441,8 +441,8 @@ print("  4. Application numbers extracted per category")
 print("  5. Visualization of data distribution")
 print()
 print("Files created:")
-print("  📄 application_numbers_by_category.json")
-print("  📊 discovery_results.png")
+print("  application_numbers_by_category.json")
+print("  discovery_results.png")
 print()
 print("=" * 60)
 print("NEXT STEP: Run Notebook 02 (Seed Collection)")
@@ -450,6 +450,6 @@ print("  → Uses the application numbers to pull full text from HUPD")
 print("  → Takes about 1-1.5 hours")
 print("=" * 60)
 print()
-print("⚡ If any cells showed warnings about column names,")
+print("If any cells showed warnings about column names,")
 print("   copy the Cell 4 output and share it with Claude.")
 print("   Claude will give you the exact fix.")

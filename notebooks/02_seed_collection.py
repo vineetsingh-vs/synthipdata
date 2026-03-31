@@ -21,7 +21,7 @@ from tqdm import tqdm
 import boto3
 import os
 
-print("✅ Libraries ready!")
+print("Libraries ready!")
 
 
 # ==========================================
@@ -32,7 +32,7 @@ print("✅ Libraries ready!")
 with open("application_numbers_by_category.json", "r") as f:
     app_numbers = json.load(f)
 
-print("📋 Application numbers per category:")
+print("Application numbers per category:")
 total = 0
 for category, numbers in app_numbers.items():
     print(f"   {category:35s} → {len(numbers):>5} applications")
@@ -55,7 +55,7 @@ print(f"   Unique application numbers: {len(all_app_nums):,}")
 # one record at a time and only keep the ones we need.
 # We never download the full 360GB.
 
-print("⏳ Streaming HUPD dataset from HuggingFace...")
+print("Streaming HUPD dataset from HuggingFace...")
 print("   This reads records one at a time (no 360GB download!)")
 print("   It will take 30-60 minutes to scan through the dataset.")
 print()
@@ -69,7 +69,7 @@ try:
         trust_remote_code=True
     )
 except Exception as e:
-    print(f"⚠️  Error loading HUPD: {e}")
+    print(f"Error loading HUPD: {e}")
     print("   Try: load_dataset('HUPD/hupd', name='sample', split='train')")
     print("   This loads a smaller sample instead of the full dataset.")
     hupd = load_dataset("HUPD/hupd", name="sample", split="train", streaming=True)
@@ -111,7 +111,7 @@ for record in tqdm(hupd, desc="Scanning HUPD"):
     if scanned % 100000 == 0:
         print(f"\n   Scanned {scanned:,} records, found {len(matched_records)} matches")
 
-print(f"\n✅ Scan complete!")
+print(f"\nScan complete!")
 print(f"   Scanned: {scanned:,} records")
 print(f"   Matched: {len(matched_records)} applications")
 print(f"   Target:  {len(all_app_nums)} applications")
@@ -139,9 +139,9 @@ for record in matched_records:
         record["category"] = cat
         categorized[cat].append(record)
 
-print("📋 Records per category:")
+print("Records per category:")
 for cat, records in categorized.items():
-    status = "✅" if len(records) >= 50 else "⚠️" if len(records) >= 20 else "❌"
+    status = "" if len(records) >= 50 else "" if len(records) >= 20 else ""
     print(f"   {status} {cat:35s} → {len(records):>5} seed documents")
 
 
@@ -195,13 +195,13 @@ for cat, records in categorized.items():
         if len(cleaned["full_text"]) > 200:
             all_seeds.append(cleaned)
 
-print(f"✅ Cleaned {len(all_seeds)} seed documents")
+print(f"Cleaned {len(all_seeds)} seed documents")
 print(f"   (Dropped {sum(len(r) for r in categorized.values()) - len(all_seeds)} empty/short records)")
 
 # Show sample
 if all_seeds:
     sample = all_seeds[0]
-    print(f"\n📄 Sample seed document:")
+    print(f"\nSample seed document:")
     print(f"   App Number: {sample['application_number']}")
     print(f"   Category:   {sample['category']}")
     print(f"   Title:      {sample['title'][:100]}...")
@@ -225,14 +225,14 @@ for cat in app_numbers.keys():
     with open(filepath, "w") as f:
         for seed in cat_seeds:
             f.write(json.dumps(seed) + "\n")
-    print(f"💾 Saved {len(cat_seeds):>4} seeds → {filepath}")
+    print(f"Saved {len(cat_seeds):>4} seeds → {filepath}")
 
 # Save combined
 with open("seeds/all_seeds.jsonl", "w") as f:
     for seed in all_seeds:
         f.write(json.dumps(seed) + "\n")
 
-print(f"\n💾 Combined file: seeds/all_seeds.jsonl ({len(all_seeds)} records)")
+print(f"\nCombined file: seeds/all_seeds.jsonl ({len(all_seeds)} records)")
 
 
 # ==========================================
@@ -240,7 +240,7 @@ print(f"\n💾 Combined file: seeds/all_seeds.jsonl ({len(all_seeds)} records)")
 # ==========================================
 # Upload seed documents to your S3 bucket
 #
-# ⚠️ REPLACE these with your actual AWS credentials
+# REPLACE these with your actual AWS credentials
 #    (or skip this cell and upload manually later)
 
 AWS_ACCESS_KEY = "YOUR_ACCESS_KEY_HERE"      # ← Replace this
@@ -263,9 +263,9 @@ if "YOUR_ACCESS_KEY" not in AWS_ACCESS_KEY:
                 Bucket=S3_BUCKET,
                 CreateBucketConfiguration={'LocationConstraint': AWS_REGION}
             )
-            print(f"✅ Created S3 bucket: {S3_BUCKET}")
+            print(f"Created S3 bucket: {S3_BUCKET}")
         except s3.exceptions.BucketAlreadyOwnedByYou:
-            print(f"✅ S3 bucket already exists: {S3_BUCKET}")
+            print(f"S3 bucket already exists: {S3_BUCKET}")
         except Exception as e:
             print(f"   Bucket may already exist: {e}")
         
@@ -274,15 +274,15 @@ if "YOUR_ACCESS_KEY" not in AWS_ACCESS_KEY:
             filepath = f"seeds/{filename}"
             s3_key = f"seeds/{filename}"
             s3.upload_file(filepath, S3_BUCKET, s3_key)
-            print(f"   ⬆️  Uploaded: s3://{S3_BUCKET}/{s3_key}")
+            print(f"   Uploaded: s3://{S3_BUCKET}/{s3_key}")
         
-        print(f"\n✅ All seeds uploaded to S3!")
+        print(f"\nAll seeds uploaded to S3!")
         
     except Exception as e:
-        print(f"⚠️  S3 upload failed: {e}")
+        print(f"S3 upload failed: {e}")
         print("   You can upload manually later. Seeds are saved locally in /seeds/")
 else:
-    print("⚠️  AWS credentials not set. Skipping S3 upload.")
+    print("AWS credentials not set. Skipping S3 upload.")
     print("   Replace AWS_ACCESS_KEY and AWS_SECRET_KEY above to enable upload.")
     print("   Seeds are saved locally in /seeds/ — you can upload manually later.")
 
@@ -292,13 +292,13 @@ else:
 # ==========================================
 
 print("=" * 60)
-print("📋 DAY 1 — SEED COLLECTION COMPLETE")
+print("DAY 1 — SEED COLLECTION COMPLETE")
 print("=" * 60)
 print()
 print("What you now have:")
-print(f"  🌱 {len(all_seeds)} seed documents across 8 rare categories")
-print(f"  💾 Saved locally in /seeds/ folder")
-print(f"  ☁️  {'Uploaded to S3' if 'YOUR_ACCESS_KEY' not in AWS_ACCESS_KEY else 'Not yet uploaded to S3'}")
+print(f"  {len(all_seeds)} seed documents across 8 rare categories")
+print(f"  Saved locally in /seeds/ folder")
+print(f"  {'Uploaded to S3' if 'YOUR_ACCESS_KEY' not in AWS_ACCESS_KEY else 'Not yet uploaded to S3'}")
 print()
 
 print("Seeds per category:")

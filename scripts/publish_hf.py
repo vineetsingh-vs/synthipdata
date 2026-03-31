@@ -33,13 +33,13 @@ def main():
     # Check for HF token
     hf_token = os.environ.get("HF_TOKEN")
     if not hf_token:
-        print("⚠️  HuggingFace token not found.")
+        print("HuggingFace token not found.")
         print("   Set it with: export HF_TOKEN='your_token'")
         print("   Get your token at: https://huggingface.co/settings/tokens")
         return
     
     # Load all JSONL files
-    print(f"📂 Loading data from {args.data_dir}")
+    print(f"Loading data from {args.data_dir}")
     all_records = []
     
     for filename in sorted(os.listdir(args.data_dir)):
@@ -52,7 +52,7 @@ def main():
     print(f"\n   Total records: {len(all_records):,}")
     
     if not all_records:
-        print("❌ No records found. Check your data directory.")
+        print("No records found. Check your data directory.")
         return
     
     # Create HuggingFace dataset
@@ -65,19 +65,19 @@ def main():
         "test": split["test"]
     })
     
-    print(f"\n📊 Dataset splits:")
+    print(f"\nDataset splits:")
     print(f"   Train: {len(dataset_dict['train']):,} records")
     print(f"   Test:  {len(dataset_dict['test']):,} records")
     
     # Push to HuggingFace
-    print(f"\n⬆️  Pushing to HuggingFace: {args.repo}")
+    print(f"\nPushing to HuggingFace: {args.repo}")
     dataset_dict.push_to_hub(
         args.repo,
         token=hf_token,
         private=args.private
     )
     
-    print(f"\n✅ Published!")
+    print(f"\nPublished!")
     print(f"   URL: https://huggingface.co/datasets/{args.repo}")
     print(f"\n   Anyone can now use it with:")
     print(f"   ds = load_dataset('{args.repo}')")

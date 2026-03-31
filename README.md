@@ -1,6 +1,6 @@
 # SynthIPData: Synthetic Data Augmentation for Rare-Case IP Lifecycle Scenarios
 
-[![Dataset on HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/vineetsingh-vs/synthipdata)
+[![Dataset on HuggingFace](https://img.shields.io/badge/_HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/vineetsingh-vs/synthipdata)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
 

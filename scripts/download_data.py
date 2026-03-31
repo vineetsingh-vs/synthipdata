@@ -11,7 +11,7 @@ import argparse
 
 def download_file(url, output_path):
     """Download a file with progress reporting."""
-    print(f"⬇️  Downloading: {url}")
+    print(f"Downloading: {url}")
     print(f"   Saving to: {output_path}")
     
     def progress_hook(count, block_size, total_size):
@@ -20,7 +20,7 @@ def download_file(url, output_path):
     
     urllib.request.urlretrieve(url, output_path, reporthook=progress_hook)
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
-    print(f"\n✅ Downloaded ({size_mb:.1f} MB)")
+    print(f"\nDownloaded ({size_mb:.1f} MB)")
 
 
 def main():
@@ -50,10 +50,10 @@ def main():
         print("   Extracting...")
         with zipfile.ZipFile(oa_path, "r") as z:
             z.extractall(args.output_dir)
-        print("   ✅ Extracted!")
+        print("   Extracted!")
         
     except Exception as e:
-        print(f"   ⚠️  Download failed: {e}")
+        print(f"   Download failed: {e}")
         print("   Please download manually from the USPTO website.")
     
     print("\n" + "=" * 60)
