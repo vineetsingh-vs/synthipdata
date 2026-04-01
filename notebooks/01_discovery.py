@@ -1,10 +1,15 @@
 # ============================================================
-# SynthIPData — Notebook 01: Discovery
+# SynthIPData -- Notebook 01: Discovery
 # ============================================================
-# PURPOSE:  Download USPTO data, find rare patent categories
+# PURPOSE:  Download USPTO data, automatically discover rare
+#           patent categories, and generate configs for the
+#           rest of the pipeline.
+#
+# NOTHING IS HARDCODED. The data tells us what's rare.
+#
 # RUN ON:   Google Colab (free tier)
 # TIME:     ~30 minutes
-# 
+#
 # INSTRUCTIONS:
 # 1. Go to colab.research.google.com
 # 2. Click "New Notebook"
@@ -17,7 +22,7 @@
 # CELL 1: Install Libraries
 # ==========================
 
-!pip install pandas matplotlib seaborn requests tqdm datasets -q
+!pip install pandas matplotlib seaborn requests tqdm datasets pyyaml -q
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,6 +31,8 @@ import numpy as np
 from tqdm import tqdm
 import requests
 import os
+import json
+import yaml
 
 print("Libraries installed and imported!")
 
@@ -33,54 +40,46 @@ print("Libraries installed and imported!")
 # =========================================
 # CELL 2: Download Office Action Dataset
 # =========================================
-# This downloads the USPTO Office Action Research Dataset
+# This downloads the USPTO Office Action Research Dataset.
 # Source: https://www.uspto.gov/ip-policy/economic-research/research-datasets
 #
-# If the URL below doesn't work, go to the source page above
-# and find the current download link for the Office Action dataset
+# If the URL doesn't work, go to the source page and find the current link.
 
 import urllib.request
+import zipfile
 
-# USPTO Office Action dataset URL
-# NOTE: Update this URL if it changes. Check the USPTO research datasets page.
 OA_URL = "https://bulkdata.uspto.gov/data/patent/office/actions/bigdata/2024/office_action_research_dataset.csv.zip"
 
 print("Downloading USPTO Office Action Dataset...")
-print("   (This may take 5-10 minutes depending on your connection)")
-print("   If the download fails, the URL may have changed.")
-print("   Check: https://www.uspto.gov/ip-policy/economic-research/research-datasets")
+print("(This may take 5-10 minutes depending on your connection)")
+print()
 
 try:
     urllib.request.urlretrieve(OA_URL, "oa_dataset.zip")
-    print("Downloaded!")
-    
-    # Unzip
-    import zipfile
+    print("Download complete!")
+
     with zipfile.ZipFile("oa_dataset.zip", "r") as z:
         z.extractall("oa_data/")
     print("Unzipped!")
-    
-    # Find the CSV file
+
     csv_files = [f for f in os.listdir("oa_data/") if f.endswith(".csv")]
     print(f"Found files: {csv_files}")
-    
+
 except Exception as e:
     print(f"Download failed: {e}")
-    print("")
-    print("Don't worry! Here's what to do:")
+    print()
+    print("Manual download steps:")
     print("1. Go to: https://www.uspto.gov/ip-policy/economic-research/research-datasets")
     print("2. Find 'Office Action Research Dataset'")
-    print("3. Download the CSV file manually")
-    print("4. Upload it to Colab (click the folder icon on the left → upload)")
-    print("5. Then continue to the next cell")
+    print("3. Download the CSV file")
+    print("4. Upload it to Colab (click the folder icon on the left, then upload)")
+    print("5. Continue to the next cell")
 
 
 # ==========================================
-# CELL 3: Load and Explore the Data
+# CELL 3: Load the Data
 # ==========================================
-# This loads the CSV and shows you what's inside
 
-# Try to find the CSV file
 import glob
 
 csv_files = glob.glob("oa_data/*.csv") + glob.glob("*.csv")
@@ -88,368 +87,497 @@ if csv_files:
     csv_path = csv_files[0]
     print(f"Loading: {csv_path}")
 else:
-    # If download failed, user needs to upload manually
     csv_path = input("Enter the path to your CSV file: ")
 
-# Load the data
 print("Loading data (this may take a minute for large files)...")
 df = pd.read_csv(csv_path, low_memory=False)
 
-print(f"\nLoaded {len(df):,} records")
+print(f"Loaded {len(df):,} records")
 print(f"\nColumns in the dataset:")
 for col in df.columns:
     print(f"   - {col}")
 
-print(f"\nFirst 5 rows:")
-df.head()
+print(f"\nFirst 3 rows:")
+df.head(3)
 
 
 # ==========================================
-# CELL 4: Understand the Data
+# CELL 4: Auto-Detect Column Types
 # ==========================================
-# Before finding rare cases, let's understand what we have
+# The script automatically finds the right columns.
+# If it guesses wrong, you can override manually at the bottom.
 
 print("=" * 60)
-print("DATASET OVERVIEW")
+print("AUTO-DETECTING COLUMN TYPES")
 print("=" * 60)
 
-print(f"\nTotal records: {len(df):,}")
-print(f"Date range: {df['filing_date'].min() if 'filing_date' in df.columns else 'N/A'} to {df['filing_date'].max() if 'filing_date' in df.columns else 'N/A'}")
+# --- Find rejection type column(s) ---
+rej_type_col = None
+rej_bool_cols = []
 
-# Show all column names and their types
-print(f"\nColumn details:")
-for col in df.columns:
-    non_null = df[col].count()
-    dtype = df[col].dtype
-    unique = df[col].nunique()
-    print(f"   {col:40s} | {str(dtype):10s} | {non_null:>10,} values | {unique:>8,} unique")
+# Option A: Single column with rejection type labels
+for candidate in ['rejection_type', 'rejection_ground', 'rejection_basis',
+                   'ground_type', 'statutory_basis', 'basis']:
+    if candidate in df.columns:
+        rej_type_col = candidate
+        break
 
-# The key columns we need to find:
-# - Rejection type (might be called: rejection_type, rejection_101, rejection_102, etc.)
-# - Technology area (might be called: uspc_class, cpc_code, technology_center, etc.)
-# - Date (might be called: filing_date, mail_date, etc.)
+# Option B: Separate boolean columns (rejection_101=1, rejection_102=1)
+if not rej_type_col:
+    rej_bool_cols = [c for c in df.columns if any(
+        term in c.lower() for term in ['101', '102', '103', '112', 'double_pat', 'restrict']
+    )]
 
-print("\nLooking for rejection-related columns:")
-rej_cols = [c for c in df.columns if any(term in c.lower() for term in ['reject', '101', '102', '103', '112'])]
-print(f"   Found: {rej_cols}")
+# --- Find technology/classification column ---
+tech_col = None
+for candidate in ['uspc_class', 'uspc_subclass', 'cpc_group', 'cpc_code',
+                   'cpc_section', 'technology_center', 'art_unit', 'gau',
+                   'tc', 'tech_center']:
+    if candidate in df.columns:
+        tech_col = candidate
+        break
 
-print("\nLooking for technology/classification columns:")
-tech_cols = [c for c in df.columns if any(term in c.lower() for term in ['cpc', 'uspc', 'class', 'tech', 'art_unit'])]
-print(f"   Found: {tech_cols}")
+# --- Find date column ---
+date_col = None
+for candidate in ['filing_date', 'mail_date', 'mail_dt', 'date',
+                   'app_filing_date', 'action_date']:
+    if candidate in df.columns:
+        date_col = candidate
+        break
 
-print("\nLooking for date columns:")
-date_cols = [c for c in df.columns if any(term in c.lower() for term in ['date', 'year'])]
-print(f"   Found: {date_cols}")
+# --- Find application number column ---
+app_num_col = None
+for candidate in ['application_number', 'app_id', 'patent_id',
+                   'application_id', 'appln_id', 'app_no']:
+    if candidate in df.columns:
+        app_num_col = candidate
+        break
 
-print("\nIMPORTANT: Copy the column names above and share them with Claude.")
-print("   Claude will help you write the exact filtering code for YOUR dataset.")
+# --- Report findings ---
+print(f"\nRejection type column:    {rej_type_col or 'NOT FOUND'}")
+if rej_bool_cols:
+    print(f"Rejection boolean cols:   {rej_bool_cols}")
+print(f"Technology area column:   {tech_col or 'NOT FOUND'}")
+print(f"Date column:              {date_col or 'NOT FOUND'}")
+print(f"Application number col:   {app_num_col or 'NOT FOUND'}")
+
+# --- Show sample values for detected columns ---
+print("\n" + "-" * 60)
+print("SAMPLE VALUES (verify these look correct)")
+print("-" * 60)
+
+if rej_type_col:
+    print(f"\n{rej_type_col} (top 5 values):")
+    print(df[rej_type_col].value_counts().head())
+
+if tech_col:
+    print(f"\n{tech_col} (top 5 values):")
+    print(df[tech_col].value_counts().head())
+
+if date_col:
+    print(f"\n{date_col} (sample):")
+    print(df[date_col].head())
+
+# --- Manual override section ---
+print("\n" + "=" * 60)
+print("If any column above is wrong, uncomment and set manually:")
+print("# rej_type_col = 'your_column_name'")
+print("# tech_col = 'your_column_name'")
+print("# date_col = 'your_column_name'")
+print("# app_num_col = 'your_column_name'")
+print("=" * 60)
+
+# UNCOMMENT AND EDIT BELOW IF NEEDED:
+# rej_type_col = 'your_column_name'
+# tech_col = 'your_column_name'
+# date_col = 'your_column_name'
+# app_num_col = 'your_column_name'
 
 
 # ==========================================
 # CELL 5: Filter to 2015-2024
 # ==========================================
-# We only want post-Alice (2014) data
-# 
-# You may need to adjust the column name below
-# based on what you saw in Cell 4
-
-# Try common date column names
-date_col = None
-for candidate in ['filing_date', 'mail_date', 'date', 'app_filing_date']:
-    if candidate in df.columns:
-        date_col = candidate
-        break
+# Post-Alice (2014) data only for consistent legal standards.
 
 if date_col:
-    # Convert to datetime and extract year
     df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
     df['year'] = df[date_col].dt.year
-    
-    # Filter to 2015-2024
     df_filtered = df[df['year'].between(2015, 2024)].copy()
-    
-    print(f"Date column used: {date_col}")
+
+    print(f"Date column: {date_col}")
     print(f"Before filter: {len(df):,} records")
     print(f"After filter (2015-2024): {len(df_filtered):,} records")
-    
     print(f"\nRecords per year:")
-    print(df_filtered['year'].value_counts().sort_index())
+    print(df_filtered['year'].value_counts().sort_index().to_string())
 else:
-    print("Could not find a date column automatically.")
-    print("   Check the column names from Cell 4 and set date_col manually:")
-    print("   date_col = 'your_column_name_here'")
-    df_filtered = df.copy()  # Use all data for now
+    print("No date column found. Using all data.")
+    df_filtered = df.copy()
 
 
 # ==========================================
-# CELL 6: Count Rejection Types
+# CELL 6: Count Everything Automatically
 # ==========================================
-# This is the KEY discovery step
-# We count how often each rejection type appears
-#
-# The column names below may need adjustment
-# based on your actual data from Cell 4
+# This is where rare cases reveal themselves.
+# We count EVERY rejection + technology combination
+# and sort by frequency. No hardcoded categories.
 
-# Common patterns in USPTO Office Action datasets:
-# Option A: Single column with rejection type
-# Option B: Separate boolean columns (rejection_101=1, rejection_102=1, etc.)
+print("=" * 60)
+print("COUNTING ALL REJECTION x TECHNOLOGY COMBINATIONS")
+print("=" * 60)
 
-# Try Option A first
-rej_type_col = None
-for candidate in ['rejection_type', 'rejection_ground', 'ifw_number']:
-    if candidate in df_filtered.columns:
-        rej_type_col = candidate
-        break
+# --- Handle two data formats ---
 
-if rej_type_col:
-    print(f"Using rejection column: {rej_type_col}")
-    print(f"\nRejection Type Counts:")
-    print("=" * 50)
-    counts = df_filtered[rej_type_col].value_counts()
-    for rej_type, count in counts.items():
-        pct = count / len(df_filtered) * 100
-        bar = "█" * int(pct)
-        print(f"  {str(rej_type):25s} → {count:>10,} ({pct:5.1f}%) {bar}")
+# If we have a single rejection type column
+if rej_type_col and tech_col:
+    # Clean up values
+    df_filtered[rej_type_col] = df_filtered[rej_type_col].astype(str).str.strip()
+    df_filtered[tech_col] = df_filtered[tech_col].astype(str).str.strip()
+
+    # Count all combinations
+    combos = (df_filtered
+              .groupby([rej_type_col, tech_col])
+              .size()
+              .reset_index(name='count'))
+    combos = combos.sort_values('count', ascending=True)
+
+    total_records = len(df_filtered)
+    combos['percentage'] = (combos['count'] / total_records * 100).round(3)
+
+    print(f"\nTotal records: {total_records:,}")
+    print(f"Unique rejection types: {df_filtered[rej_type_col].nunique()}")
+    print(f"Unique tech areas: {df_filtered[tech_col].nunique()}")
+    print(f"Unique combinations: {len(combos):,}")
+
+# If we have boolean rejection columns instead
+elif rej_bool_cols and tech_col:
+    df_filtered[tech_col] = df_filtered[tech_col].astype(str).str.strip()
+
+    rows = []
+    for col in rej_bool_cols:
+        if df_filtered[col].dtype in ['int64', 'float64']:
+            subset = df_filtered[df_filtered[col] == 1]
+        else:
+            subset = df_filtered[df_filtered[col] == True]
+        for tech, group in subset.groupby(tech_col):
+            rows.append({
+                'rejection_type': col,
+                tech_col: tech,
+                'count': len(group)
+            })
+
+    combos = pd.DataFrame(rows).sort_values('count', ascending=True)
+    total_records = len(df_filtered)
+    combos['percentage'] = (combos['count'] / total_records * 100).round(3)
+    rej_type_col = 'rejection_type'
+
+    print(f"\nTotal records: {total_records:,}")
+    print(f"Rejection columns: {len(rej_bool_cols)}")
+    print(f"Unique tech areas: {df_filtered[tech_col].nunique()}")
+    print(f"Unique combinations: {len(combos):,}")
+
 else:
-    # Try Option B: boolean columns
-    print("Looking for individual rejection columns...")
-    rej_bool_cols = [c for c in df_filtered.columns if any(
-        term in c.lower() for term in ['101', '102', '103', '112', 'double_pat', 'restrict']
-    )]
-    
-    if rej_bool_cols:
-        print(f"\nFound boolean rejection columns: {rej_bool_cols}")
-        print(f"\nRejection Type Counts:")
-        print("=" * 50)
-        for col in rej_bool_cols:
-            count = df_filtered[col].sum() if df_filtered[col].dtype in ['int64', 'float64', 'bool'] else df_filtered[col].value_counts().get(1, 0)
-            pct = count / len(df_filtered) * 100
-            bar = "█" * int(pct)
-            print(f"  {col:25s} → {count:>10,} ({pct:5.1f}%) {bar}")
-    else:
-        print("Could not find rejection type columns automatically.")
-        print("   Share the column names from Cell 4 with Claude for help.")
+    print("ERROR: Could not find required columns.")
+    print("Go back to Cell 4 and set the column names manually.")
+    combos = pd.DataFrame()
 
 
 # ==========================================
-# CELL 7: Find Rare Combinations
+# CELL 7: Automatically Identify Rare Cases
 # ==========================================
-# Cross-reference rejection types with technology areas
-# THIS is where rare cases reveal themselves
+# We define "rare" based on percentiles calculated from YOUR data.
+# Nothing is pre-defined. The script finds them automatically.
 
-# Try to find technology area column
-tech_col = None
-for candidate in ['uspc_class', 'cpc_group', 'cpc_code', 'technology_center', 'art_unit', 'gau']:
-    if candidate in df_filtered.columns:
-        tech_col = candidate
-        break
+if len(combos) > 0:
+    # Calculate rarity thresholds from the data
+    p10 = combos['count'].quantile(0.10)
+    p25 = combos['count'].quantile(0.25)
+    median = combos['count'].quantile(0.50)
 
-if tech_col and rej_type_col:
-    print(f"Cross-referencing: {rej_type_col} × {tech_col}")
+    # Classify each combination
+    def classify_rarity(count):
+        if count <= p10:
+            return "VERY RARE"
+        elif count <= p25:
+            return "RARE"
+        elif count <= median:
+            return "UNCOMMON"
+        else:
+            return "COMMON"
+
+    combos['rarity'] = combos['count'].apply(classify_rarity)
+
     print("=" * 60)
-    
-    # Count combinations
-    combos = df_filtered.groupby([rej_type_col, tech_col]).size().reset_index(name='count')
-    combos = combos.sort_values('count')
-    
-    # Find the rare ones (bottom 10%)
-    threshold = combos['count'].quantile(0.10)
-    rare = combos[combos['count'] <= threshold]
-    
-    print(f"\nTotal unique combinations: {len(combos):,}")
-    print(f"Rarity threshold (bottom 10%): {threshold:.0f} or fewer cases")
-    print(f"Rare combinations found: {len(rare):,}")
-    
-    print(f"\nTOP 30 RAREST COMBINATIONS:")
-    print("-" * 60)
-    for _, row in rare.head(30).iterrows():
-        print(f"  {str(row[rej_type_col]):20s} + {str(row[tech_col]):20s} → {row['count']:>6,} cases")
-    
-    print(f"\nTOP 10 MOST COMMON COMBINATIONS:")
-    print("-" * 60)
-    for _, row in combos.tail(10).iterrows():
-        print(f"  {str(row[rej_type_col]):20s} + {str(row[tech_col]):20s} → {row['count']:>6,} cases")
+    print("RARITY ANALYSIS (auto-discovered from your data)")
+    print("=" * 60)
+    print(f"\nThresholds (calculated from the data):")
+    print(f"  VERY RARE:  <= {p10:.0f} cases (bottom 10%)")
+    print(f"  RARE:       <= {p25:.0f} cases (bottom 25%)")
+    print(f"  UNCOMMON:   <= {median:.0f} cases (bottom 50%)")
+    print(f"  COMMON:     >  {median:.0f} cases (top 50%)")
 
-elif tech_col:
-    # Just show technology area distribution
-    print(f"Technology area distribution ({tech_col}):")
-    print(df_filtered[tech_col].value_counts().head(20))
-    print("\nNeed rejection type column to find rare combinations.")
-    print("   Share column names with Claude for help.")
+    print(f"\nDistribution:")
+    print(combos['rarity'].value_counts().to_string())
+
+    # Show all rare and very rare combinations
+    rare_combos = combos[combos['rarity'].isin(['VERY RARE', 'RARE'])].copy()
+    rare_combos = rare_combos.sort_values('count', ascending=True)
+
+    print(f"\n" + "=" * 60)
+    print(f"ALL RARE + VERY RARE COMBINATIONS ({len(rare_combos)} found)")
+    print("=" * 60)
+    print(f"{'#':>3}  {'Rejection Type':25s}  {'Tech Area':25s}  {'Count':>8}  {'%':>7}  {'Rarity'}")
+    print("-" * 100)
+
+    for i, (_, row) in enumerate(rare_combos.iterrows(), 1):
+        print(f"{i:>3}  {str(row[rej_type_col]):25s}  {str(row[tech_col]):25s}  {row['count']:>8,}  {row['percentage']:>6.3f}%  {row['rarity']}")
+
+    print(f"\nTotal rare combinations found: {len(rare_combos)}")
+    print(f"These are your candidates for synthetic data augmentation.")
 else:
-    print("Could not find technology area column automatically.")
-    print("   Share the column names from Cell 4 with Claude for help.")
+    print("No data to analyze. Fix column detection in Cell 4.")
 
 
 # ==========================================
-# CELL 8: Map to Our 8 Target Categories
+# CELL 8: Select Categories
 # ==========================================
-# Now let's check how many real examples exist for each of
-# our pre-defined rare categories
+# The data has shown you what's rare. Now pick which ones
+# to target for your paper.
+#
+# TWO MODES:
+#   "auto"   -- Script picks the top N rare categories that
+#               have enough seed data (recommended for first run)
+#   "manual" -- You pick specific row numbers from Cell 7 output
+#
+# Change the settings below:
 
-# CPC code to tech area mapping
-cpc_to_tech = {
-    "A61": "Biotech/Pharma",
-    "C07": "Biotech/Pharma",
-    "C12": "Biotech/Pharma",
-    "G06N": "AI/Machine Learning",
-    "B82": "Materials/Nanotech",
-    "C01B": "Materials/Nanotech",
-    "H01L": "Semiconductors"
-}
+SELECTION_MODE = "auto"   # "auto" or "manual"
+AUTO_SELECT_COUNT = 8     # How many categories to auto-select
+MIN_SEED_COUNT = 20       # Minimum cases needed (below this is too few to learn from)
 
-# Our 8 target categories
-target_categories = [
-    {"id": "101_biotech", "name": "§101 in Biotech", "rejection": "101", "cpc_prefixes": ["A61", "C07", "C12"]},
-    {"id": "101_ai_ml", "name": "§101 in AI/ML", "rejection": "101", "cpc_prefixes": ["G06N"]},
-    {"id": "dp_ai_ml", "name": "Double Patenting in AI/ML", "rejection": "double_patenting", "cpc_prefixes": ["G06N"]},
-    {"id": "112f_biotech", "name": "§112(f) in Biotech", "rejection": "112f", "cpc_prefixes": ["A61", "C07", "C12"]},
-    {"id": "restriction_ai_ml", "name": "Restriction in AI/ML", "rejection": "restriction", "cpc_prefixes": ["G06N"]},
-    {"id": "112a_ai_ml", "name": "§112(a) in AI/ML", "rejection": "112a", "cpc_prefixes": ["G06N"]},
-    {"id": "101_nanotech", "name": "§101 in Nanotech", "rejection": "101", "cpc_prefixes": ["B82", "C01B"]},
-    {"id": "dp_semiconductors", "name": "Double Patenting in Semicon", "rejection": "double_patenting", "cpc_prefixes": ["H01L"]},
-]
+# For manual mode, uncomment and list row numbers from Cell 7:
+# MANUAL_SELECTIONS = [1, 3, 5, 7, 12, 15, 18, 22]
 
-print("=" * 70)
-print("SEED AVAILABILITY CHECK — Our 8 Target Categories")
-print("=" * 70)
-print()
-print(f"NOTE: This cell requires the correct column names from YOUR dataset.")
-print(f"   If the counts below show 0 for everything, the column names need fixing.")
-print(f"   Share the Cell 4 output with Claude and he'll fix it for you.")
-print()
+if len(combos) > 0:
+    if SELECTION_MODE == "auto":
+        # Pick the rarest combinations that still have enough seeds
+        candidates = rare_combos[rare_combos['count'] >= MIN_SEED_COUNT].copy()
 
-# Try to count (this depends on actual column names)
-if rej_type_col and tech_col:
-    for cat in target_categories:
-        # Filter by rejection type
-        mask_rej = df_filtered[rej_type_col].astype(str).str.contains(cat["rejection"], case=False, na=False)
-        
-        # Filter by CPC code
-        mask_tech = False
-        for prefix in cat["cpc_prefixes"]:
-            mask_tech = mask_tech | df_filtered[tech_col].astype(str).str.startswith(prefix)
-        
-        count = len(df_filtered[mask_rej & mask_tech])
-        status = "" if count >= 50 else "" if count >= 20 else ""
-        
-        print(f"  {status} {cat['name']:35s} → {count:>6,} real cases found")
-        
-    print()
-    print("= Enough seeds (50+)")
-    print("= Low but usable (20-49)")
-    print("= Very few, may need to broaden search (<20)")
-else:
-    print("Cannot count yet — need correct column names.")
-    print("   Share Cell 4 output with Claude to proceed.")
+        if len(candidates) < AUTO_SELECT_COUNT:
+            print(f"Only {len(candidates)} rare categories have >= {MIN_SEED_COUNT} cases.")
+            print(f"Including UNCOMMON categories to reach {AUTO_SELECT_COUNT}.")
+            uncommon = combos[combos['rarity'] == 'UNCOMMON']
+            uncommon = uncommon[uncommon['count'] >= MIN_SEED_COUNT]
+            candidates = pd.concat([candidates, uncommon])
 
+        selected = candidates.head(AUTO_SELECT_COUNT).copy()
 
-# ==========================================
-# CELL 9: Get Application Numbers
-# ==========================================
-# For each category, extract the list of application numbers
-# These will be used to pull full text from HUPD
-
-if rej_type_col and tech_col:
-    app_num_col = None
-    for candidate in ['application_number', 'app_id', 'patent_id', 'application_id']:
-        if candidate in df_filtered.columns:
-            app_num_col = candidate
-            break
-    
-    if app_num_col:
         print("=" * 60)
-        print("EXTRACTING APPLICATION NUMBERS PER CATEGORY")
+        print(f"AUTO-SELECTED {len(selected)} CATEGORIES")
         print("=" * 60)
-        
-        all_app_numbers = {}
-        
-        for cat in target_categories:
-            mask_rej = df_filtered[rej_type_col].astype(str).str.contains(cat["rejection"], case=False, na=False)
-            mask_tech = False
-            for prefix in cat["cpc_prefixes"]:
-                mask_tech = mask_tech | df_filtered[tech_col].astype(str).str.startswith(prefix)
-            
-            app_numbers = df_filtered[mask_rej & mask_tech][app_num_col].unique().tolist()
-            all_app_numbers[cat["id"]] = app_numbers
-            
-            print(f"  {cat['name']:35s} → {len(app_numbers):>5} application numbers")
-        
-        # Save to file
-        import json
-        with open("application_numbers_by_category.json", "w") as f:
-            json.dump(all_app_numbers, f, indent=2, default=str)
-        
-        print(f"\nSaved to: application_numbers_by_category.json")
-        print(f"   Total unique applications: {sum(len(v) for v in all_app_numbers.values()):,}")
+
     else:
-        print("Could not find application number column.")
-        print("   Check Cell 4 output for the correct column name.")
+        # Manual: pick by row numbers from Cell 7
+        rare_indexed = rare_combos.reset_index(drop=True)
+        indices = [i - 1 for i in MANUAL_SELECTIONS]
+        selected = rare_indexed.iloc[indices].copy()
+
+        print("=" * 60)
+        print(f"MANUALLY SELECTED {len(selected)} CATEGORIES")
+        print("=" * 60)
+
+    # Display final selection
+    print(f"\n{'#':>3}  {'Rejection Type':25s}  {'Tech Area':25s}  {'Seed Count':>10}  {'Rarity'}")
+    print("-" * 80)
+    for i, (_, row) in enumerate(selected.iterrows(), 1):
+        print(f"{i:>3}  {str(row[rej_type_col]):25s}  {str(row[tech_col]):25s}  {row['count']:>10,}  {row['rarity']}")
+
+    print(f"\nTotal seed documents available: {selected['count'].sum():,}")
+    print()
+    print("Happy with these? Continue to the next cell.")
+    print("Want different ones? Set SELECTION_MODE = 'manual' and pick row numbers from Cell 7.")
+
+
+# ==========================================
+# CELL 9: Generate Config Files Automatically
+# ==========================================
+# This creates:
+#   categories.yaml                      -- Pipeline config
+#   application_numbers_by_category.json -- App numbers per category
+#   discovery_all_combinations.csv       -- Full analysis
+#   discovery_rare_combinations.csv      -- Rare ones only
+#
+# Everything is generated FROM the data. Nothing hardcoded.
+
+if len(selected) > 0:
+    # --- Build categories.yaml ---
+    categories_config = {
+        'year_range': {
+            'start': 2015,
+            'end': 2024,
+            'rationale': 'Post-Alice (2014) framework ensures consistent legal standards'
+        },
+        'discovery_stats': {
+            'total_records': int(total_records),
+            'rarity_threshold_p10': int(p10),
+            'rarity_threshold_p25': int(p25),
+            'median_count': int(median),
+            'total_rare_combinations': int(len(rare_combos))
+        },
+        'categories': [],
+        'evaluation': {
+            'memorization_threshold': 0.95,
+            'garbage_threshold': 0.30,
+            'min_validity_score': 0.70
+        }
+    }
+
+    all_app_numbers = {}
+
+    print("=" * 60)
+    print("GENERATING PIPELINE CONFIGS")
+    print("=" * 60)
+    print()
+
+    for i, (_, row) in enumerate(selected.iterrows(), 1):
+        rej_val = str(row[rej_type_col])
+        tech_val = str(row[tech_col])
+        count = int(row['count'])
+
+        # Create a clean ID from the values
+        clean_rej = rej_val.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '')
+        clean_tech = tech_val.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '')
+        cat_id = f"{clean_rej}_{clean_tech}"[:50]
+
+        # Add to categories config
+        categories_config['categories'].append({
+            'id': cat_id,
+            'name': f"{rej_val} in {tech_val}",
+            'rejection_type': rej_val,
+            'tech_area': tech_val,
+            'seed_count': count,
+            'rarity': row['rarity'],
+            'synthetic_target': min(count * 10, 2000),
+            'min_seeds_target': max(count, MIN_SEED_COUNT)
+        })
+
+        # Extract application numbers
+        mask_rej = df_filtered[rej_type_col].astype(str).str.strip() == rej_val
+        mask_tech = df_filtered[tech_col].astype(str).str.strip() == tech_val
+        app_nums = df_filtered[mask_rej & mask_tech][app_num_col].unique().tolist()
+        all_app_numbers[cat_id] = [str(x) for x in app_nums]
+
+        print(f"  Category {i}: {rej_val} + {tech_val}")
+        print(f"    ID: {cat_id}")
+        print(f"    Seeds: {count} | Synthetic target: {min(count * 10, 2000)}")
+        print(f"    Application numbers: {len(app_nums)}")
+        print()
+
+    # --- Save all files ---
+    with open("categories.yaml", "w") as f:
+        yaml.dump(categories_config, f, default_flow_style=False, sort_keys=False)
+    print("Saved: categories.yaml")
+
+    with open("application_numbers_by_category.json", "w") as f:
+        json.dump(all_app_numbers, f, indent=2)
+    print("Saved: application_numbers_by_category.json")
+
+    combos.to_csv("discovery_all_combinations.csv", index=False)
+    print("Saved: discovery_all_combinations.csv")
+
+    rare_combos.to_csv("discovery_rare_combinations.csv", index=False)
+    print("Saved: discovery_rare_combinations.csv")
+
+    # --- Print the generated config ---
+    print("\n" + "=" * 60)
+    print("GENERATED categories.yaml:")
+    print("=" * 60)
+    print(yaml.dump(categories_config, default_flow_style=False, sort_keys=False))
 
 
 # ==========================================
 # CELL 10: Visualization
 # ==========================================
 
-fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+if len(combos) > 0 and len(selected) > 0:
+    fig, axes = plt.subplots(2, 2, figsize=(18, 12))
 
-# Plot 1: Rejection type distribution
-if rej_type_col:
-    counts = df_filtered[rej_type_col].value_counts().head(10)
-    counts.plot(kind='barh', ax=axes[0], color='steelblue')
-    axes[0].set_title('Top 10 Rejection Types (2015-2024)', fontsize=13)
-    axes[0].set_xlabel('Count')
+    # Plot 1: Overall rejection type distribution
+    if rej_type_col:
+        rej_counts = df_filtered[rej_type_col].value_counts().head(15)
+        rej_counts.plot(kind='barh', ax=axes[0, 0], color='steelblue')
+        axes[0, 0].set_title('Top 15 Rejection Types (2015-2024)', fontsize=13)
+        axes[0, 0].set_xlabel('Count')
 
-# Plot 2: Our categories seed counts
-if rej_type_col and tech_col:
-    cat_names = []
-    cat_counts = []
-    for cat in target_categories:
-        mask_rej = df_filtered[rej_type_col].astype(str).str.contains(cat["rejection"], case=False, na=False)
-        mask_tech = False
-        for prefix in cat["cpc_prefixes"]:
-            mask_tech = mask_tech | df_filtered[tech_col].astype(str).str.startswith(prefix)
-        count = len(df_filtered[mask_rej & mask_tech])
-        cat_names.append(cat["name"])
-        cat_counts.append(count)
-    
-    colors = ['#d32f2f' if c < 50 else '#ff9800' if c < 200 else '#4caf50' for c in cat_counts]
-    axes[1].barh(cat_names, cat_counts, color=colors)
-    axes[1].set_title('Seed Availability per Category', fontsize=13)
-    axes[1].set_xlabel('Real Cases Found')
+    # Plot 2: Rarity distribution
+    rarity_counts = combos['rarity'].value_counts()
+    colors_map = {'VERY RARE': '#d32f2f', 'RARE': '#ff9800', 'UNCOMMON': '#ffeb3b', 'COMMON': '#4caf50'}
+    rarity_colors = [colors_map.get(r, '#999999') for r in rarity_counts.index]
+    rarity_counts.plot(kind='bar', ax=axes[0, 1], color=rarity_colors)
+    axes[0, 1].set_title('Combination Rarity Distribution', fontsize=13)
+    axes[0, 1].set_ylabel('Number of Combinations')
+    axes[0, 1].tick_params(axis='x', rotation=0)
 
-plt.tight_layout()
-plt.savefig("discovery_results.png", dpi=150, bbox_inches="tight")
-plt.show()
+    # Plot 3: Selected categories seed counts
+    cat_names = [f"{row[rej_type_col]}\n{row[tech_col]}" for _, row in selected.iterrows()]
+    cat_counts = selected['count'].tolist()
+    bar_colors = ['#d32f2f' if r == 'VERY RARE' else '#ff9800' for r in selected['rarity']]
+    axes[1, 0].barh(cat_names, cat_counts, color=bar_colors)
+    axes[1, 0].set_title('Selected Categories -- Seed Availability', fontsize=13)
+    axes[1, 0].set_xlabel('Real Cases Available')
 
-print("Saved: discovery_results.png")
+    # Plot 4: Log-scale frequency distribution
+    combos['count'].plot(kind='hist', bins=50, ax=axes[1, 1],
+                         color='steelblue', alpha=0.7, log=True)
+    axes[1, 1].axvline(x=p10, color='red', linestyle='--',
+                        label=f'Very Rare threshold ({p10:.0f})')
+    axes[1, 1].axvline(x=p25, color='orange', linestyle='--',
+                        label=f'Rare threshold ({p25:.0f})')
+    axes[1, 1].set_title('Frequency Distribution (log scale)', fontsize=13)
+    axes[1, 1].set_xlabel('Cases per Combination')
+    axes[1, 1].set_ylabel('Number of Combinations (log)')
+    axes[1, 1].legend()
+
+    plt.tight_layout()
+    plt.savefig("discovery_results.png", dpi=150, bbox_inches="tight")
+    plt.show()
+
+    print("Saved: discovery_results.png")
 
 
 # ==========================================
-# CELL 11: Summary & Next Steps
+# CELL 11: Summary
 # ==========================================
 
 print("=" * 60)
-print("DAY 1 — DISCOVERY COMPLETE")
+print("DAY 1 -- DISCOVERY COMPLETE")
 print("=" * 60)
 print()
-print("What you now have:")
-print("  1. USPTO Office Action data loaded and filtered (2015-2024)")
-print("  2. Rejection type frequency counts")
-print("  3. Rare-case categories identified")
-print("  4. Application numbers extracted per category")
-print("  5. Visualization of data distribution")
+print("What happened:")
+print(f"  1. Loaded {total_records:,} USPTO office action records (2015-2024)")
+print(f"  2. Found {len(combos):,} unique rejection x technology combinations")
+print(f"  3. Identified {len(rare_combos):,} rare combinations (bottom 25%)")
+print(f"  4. Selected {len(selected)} categories for synthetic augmentation")
+print(f"  5. Extracted {sum(len(v) for v in all_app_numbers.values()):,} application numbers")
 print()
 print("Files created:")
-print("  application_numbers_by_category.json")
-print("  discovery_results.png")
+print("  categories.yaml                      -- Pipeline config (auto-generated)")
+print("  application_numbers_by_category.json -- App numbers per category")
+print("  discovery_all_combinations.csv       -- Full frequency analysis")
+print("  discovery_rare_combinations.csv      -- Rare combinations only")
+print("  discovery_results.png                -- Visualization")
+print()
+print("Key difference from a hardcoded approach:")
+print("  Categories were discovered FROM the data, not pre-defined.")
+print("  Rarity thresholds were calculated FROM the data.")
+print("  Re-run on different data and categories update automatically.")
 print()
 print("=" * 60)
-print("NEXT STEP: Run Notebook 02 (Seed Collection)")
-print("  → Uses the application numbers to pull full text from HUPD")
-print("  → Takes about 1-1.5 hours")
+print("NEXT: Run Notebook 02 (Seed Collection)")
+print("  Uses application_numbers_by_category.json to pull full text from HUPD.")
+print("  Takes about 1-1.5 hours.")
 print("=" * 60)
 print()
-print("If any cells showed warnings about column names,")
-print("   copy the Cell 4 output and share it with Claude.")
-print("   Claude will give you the exact fix.")
+print("To change selected categories:")
+print("  Set SELECTION_MODE = 'manual' in Cell 8")
+print("  List row numbers from Cell 7 output")
+print("  Re-run Cells 8-11")
