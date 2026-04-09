@@ -316,4 +316,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 **Vineet Singh**
 Senior Software Engineer -- AI Infrastructure for IP Litigation Support
-[GitHub](https://github.com/vineetsingh-vs) | [HuggingFace](https://huggingface.co/vineetsinghvats) | [LinkedIn](https://linkedin.com/in/vineetsingh44)
+[GitHub](https://github.com/vineetsingh-vs/synthipdata) | [HuggingFace](https://huggingface.co/datasets/vineetsinghvats/SynthIPData) | [LinkedIn](https://linkedin.com/in/vineetsingh44)
